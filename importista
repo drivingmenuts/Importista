@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+
+import argparse
+import configparser
+import csv
+import dialects
+import datetime
+import sys
+
+from pathlib import Path
+
+config = None
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(sys.argv[0],
+                                     description="Import a series of csv files into a database.")
+
+    parser.add_argument("-p", "--path",
+                        dest="source_path",
+                        help="The directory containing the csv files",
+                        required=True)
+    parser.add_argument("-d", "--dialect",
+                        default='SQLite3',
+                        dest="sql_dialect",
+                        help="Which SQL dialect to use (default: SQLite3")
+    parser.add_argument("-f", "--fields",
+                        dest="field_defs",
+                        help="The field definitions file")
+    output_group = parser.add_mutually_exclusive_group()
+    output_group.add_argument("-s", "--save_to",
+                              dest="save_to",
+                              help="The output path for SQL scripts",
+                              metavar="OUTPUT_PATH")
+    output_group.add_argument("-w", "--write_to",
+                              dest="write_to",
+                              help="The database to write results to",
+                              metavar="DATABASE_FILE")
+
+    args = parser.parse_args()
+
+    source_path = args.source_path
+    if not Path(source_path).exists():
+        print(f"{source_path} does not exist ... exiting.")
+        exit(-1)
+
+    sql_dialect = args.sql_dialect
+    db = dialects.get_dialect(sql_dialect)
+
+    field_defs = args.field_defs
+    if not Path(field_defs).exists:
+        print(f"{field_defs} does not exit ... exiting.")
+        exit(-1)
+    config = configparser.ConfigParser()
+    config.read(Path(field_defs))
+
+    for filename in Path(source_path).glob("*.csv"):
+        if not Path(filename).stem in config.sections():
+            continue
