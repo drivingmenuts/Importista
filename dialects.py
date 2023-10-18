@@ -69,17 +69,17 @@ class Base:
             .replace('{fmod}', fmod) \
             .strip()
 
-    def create_db_stmt(self, database_name, end=';'):
+    def make_create_db_stmt(self, database_name, end=';'):
         stmt = self.STMTS['create_db']
         return stmt \
             .replace('{database_name}', database_name) \
             .replace('{end}', end) \
             .strip()
 
-    def drop_db_stmt(self):
+    def make_drop_db_stmt(self):
         raise NotImplementedError(f"Not implemented.")
 
-    def create_table_stmt(self, table_name, field_defs, end=';'):
+    def make_create_table_stmt(self, table_name, field_defs, end=';'):
         stmt = self.STMTS['create_table']
         return stmt \
             .replace('{table_name}', table_name) \
@@ -87,7 +87,16 @@ class Base:
             .replace('{end}', end) \
             .strip()
 
-    def create_index(self, index_field, table_name, field_list=None, index_prefix="idx_", end=';'):
+    def make_insert_stmt(self, table_name, field_list, value_list, end=';'):
+        stmt = self.STMTS['insert_table']
+        return stmt \
+            .replace('{table_name}', table_name) \
+            .replace('{field_list}', "', '".join(field_list)) \
+            .replace('{value_list}', "', '".join(value_list)) \
+            .replace('{end}', end) \
+            .strip()
+
+    def make_create_index_stmt(self, index_field, table_name, field_list=None, index_prefix="idx_", end=';'):
         stmt = self.STMTS['create_index']
         if field_list is None:
             field_list = [index_field]
@@ -99,14 +108,14 @@ class Base:
             .replace('{end}', end) \
             .strip()
 
-    def drop_table_stmt(self, table_name, end=';'):
+    def make_drop_table_stmt(self, table_name, end=';'):
         stmt = self.STMTS['drop_table']
         return stmt \
             .replace('{table_name}', table_name) \
             .replace('{end}', end) \
             .strip()
 
-    def create_db(cls, database_name=None):
+    def _make_db(cls, database_name=None):
         raise NotImplementedError(f"Not implemented.")
 
 
@@ -139,15 +148,15 @@ class SQLite3(Base):
     STMTS = {
         'create_db': None,
         'create_index': "CREATE INDEX IF NOT EXISTS '{index_prefix}{index_name}' ON '{table_name}' ('{field_list}'){end}",
-        'create_table': "CREATE TABLE IF NOT EXISTS '{table_name}' ({field_defs}){end}",
+        'create_table': "CREATE TABLE IF NOT EXISTS '{table_name}' ({field_list}) VALUES ({value_list}){end}",
         'insert_table': "INSERT INTO '{table_name}' VALUES({values_list}){end}",
         'drop_table': "DROP TABLE IF EXISTS '{table_name}'{end}",
     }
 
     def __init__(self):
-        self.STMTS['create_db'] = self.create_db
+        self.STMTS['make_db'] = self.make_db
 
-    def create_db(cls, database_name):
+    def make_db(cls, database_name):
         raise NotImplementedError(f"Not implemented yet")
         return False
 
@@ -223,7 +232,7 @@ class PostgreSQL(Base):
     }
     DEFAULT_TYPE = 'TEXT'
     STMTS = {
-        'create_db': None,
+        'make_db': None,
         'create_index': "CREATE INDEX IF NOT EXISTS '{index_prefix}{index_name}' ON '{table_name}' ('{field_list}'){end}",
         'create_table': "CREATE TABLE IF NOT EXISTS '{table_name}' ({field_defs}){end}",
         'insert_table': "INSERT INTO '{table_name}' VALUES({values_list}){end}",
@@ -233,9 +242,9 @@ class PostgreSQL(Base):
     def __init__(self):
         class_name = self.__class__.__name__
         print(f"Warning: {class_name} dialect has not yet been tested!")
-        self.STMTS['create_db'] = self.create_db
+        self.STMTS['make_db'] = self.make_db
 
-    def create_db(cls, database_name):
+    def make_db(cls, database_name):
         raise NotImplementedError(f"Not implemented yet")
         return False
 
@@ -271,26 +280,27 @@ if __name__ == '__main__':
     print('POSTGRES: ' + p.get_type('money'))
 
     print('\nCreating databases\n' + dash())
-    print('MYSQL: ' + m.create_db_stmt(TEST_DATABASE))
+    print('MYSQL: ' + m.make_create_db_stmt(TEST_DATABASE))
 
     print('\nCreating tables\n' + dash())
     fields = {'person_id': 'serial', 'employee_type': 'integer', 'money': 'money', 'food': 'text'}
+    values = ['', 1, 12.00, 'Hamburger']
 
     sqlite_defs = ','.join([s.get_field(fn, fields[fn]) for fn in fields.keys()])
-    print('SQLITE: \t' + s.create_table_stmt(TEST_TABLE, sqlite_defs))
-    print('\t\t' + s.create_index('employee_type', TEST_TABLE), '\n\n')
+    print('SQLITE: \t' + s.make_create_table_stmt(TEST_TABLE, sqlite_defs))
+    print('\t\t' + s.make_create_index_stmt('employee_type', TEST_TABLE), '\n\n')
 
     mysql_defs = ','.join([m.get_field(fn, fields[fn]) for fn in fields.keys()])
-    print('MYSQL: \t\t' + m.create_table_stmt(TEST_TABLE, mysql_defs))
-    print('\t\t' + m.create_index('etype_pid', TEST_TABLE, ['employee_type', 'person_id']), '\n\n')
+    print('MYSQL: \t\t' + m.make_create_table_stmt(TEST_TABLE, mysql_defs))
+    print('\t\t' + m.make_create_index_stmt('etype_pid', TEST_TABLE, ['employee_type', 'person_id']), '\n\n')
 
     postgres_defs = ','.join([m.get_field(fn, fields[fn]) for fn in fields.keys()])
-    print('POSTGRES: \t' + m.create_table_stmt(TEST_TABLE, postgres_defs))
-    print('\t\t' + p.create_index('etype_pid', TEST_TABLE, ['employee_type', 'person_id'], 'index_'), '\n\n')
+    print('POSTGRES: \t' + m.make_create_table_stmt(TEST_TABLE, postgres_defs))
+    print('\t\t' + p.make_create_index_stmt('etype_pid', TEST_TABLE, ['employee_type', 'person_id'], 'index_'), '\n\n')
 
     print('\nDropping tables\n' + dash())
-    print('SQLITE: ' + s.drop_table_stmt(TEST_TABLE))
-    print('MYSQL: ' + m.drop_table_stmt(TEST_TABLE))
-    print('POSTGRES: ' + p.drop_table_stmt(TEST_TABLE))
+    print('SQLITE: ' + s.make_drop_table_stmt(TEST_TABLE))
+    print('MYSQL: ' + m.make_drop_table_stmt(TEST_TABLE))
+    print('POSTGRES: ' + p.make_drop_table_stmt(TEST_TABLE))
 
     print('\nDone.')
