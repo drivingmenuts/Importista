@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 source_path = None
+text_only = None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(sys.argv[0],
@@ -17,6 +18,11 @@ if __name__ == "__main__":
                         dest="source_path",
                         help="The directory containing the csv files",
                         required=True)
+    parser.add_argument("-t", "--textonly",
+                        action="store_true",
+                        default=False,
+                        dest="text_only",
+                        help="Don't translate id fields to serial/integer")
 
     args = parser.parse_args()
 
@@ -24,6 +30,8 @@ if __name__ == "__main__":
     if not source_path.exists():
         raise NotADirectoryError(f"{source_path} not found or is not a directory")
         exit(-1)
+
+    text_only = args.text_only
 
     print(f"# Generated {datetime.datetime.now()}", end="\n\n")
     for f in source_path.glob("*.csv"):
@@ -34,11 +42,14 @@ if __name__ == "__main__":
             found_id = False
             for field_name in csv_data.fieldnames:
                 field_name = field_name.replace(" ", "_")
-                field_type = "TEXT"
-                if "_id" in field_name and found_id is True:
-                    field_type = "INTEGER"
-                if ("_id" in field_name or "id" == field_name) and found_id is not True:
-                    field_type = "INTEGER PRIMARY KEY AUTONUMBER"
-                    found_id = True
+                field_type = "text"
+                if text_only:
+                    pass
+                else:
+                    if ("_id" in str(field_name).lower() or "id" in str(field_name).lower()) and found_id is True:
+                        field_type = "integer"
+                    if ("_id" in str(field_name).lower() or "id" in str(field_name).lower()) and found_id is not True:
+                        field_type = "serial"
+                        found_id = True
                 print(f"{field_name} = {field_type}")
             print()
