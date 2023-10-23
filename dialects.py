@@ -7,6 +7,7 @@ def __dir__():
     return [
         'get_dialect',
         'get_type',
+        'retype',
         'Base',
         'SQLite3',
         'MySQL',
@@ -35,6 +36,26 @@ def get_type(v: object):
     return "str"
 
 
+def retype(value: object, python_type: str) -> object:
+    match python_type:
+        case 'None':
+            return None
+        case 'integer':
+            return int(value)
+        case 'float':
+            return float(value)
+        case 'string':
+            return str(value)
+        case 'blob':
+            return str(value)
+        case 'boolean':
+            if value.lower() in ['y', 'yes', 'true', '1']:
+                return 1
+            return 0
+        case _:
+            return str(value)
+
+
 class Base:
     FIELD_TYPES = None
     DEFAULT_TYPE = None
@@ -54,23 +75,6 @@ class Base:
             tval = tval.replace('format', field_format)
 
         return tval
-
-    def make_python_type(self, value: object, python_type: str) -> object:
-        match python_type:
-            case 'integer':
-                return int(value)
-            case 'float':
-                return float(value)
-            case 'string':
-                return str(value)
-            case 'blob':
-                return str(value)
-            case 'boolean':
-                if value.lower() in ['y', 'yes', 'true', '1']:
-                    return 1
-                return 0
-            case _:
-                return None
 
     def get_field(self, field_name: str, field_type: str = '', field_format: str = '',
                   field_modifier: str = None) -> str:
