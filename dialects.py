@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import inspect
 
 
@@ -15,8 +13,16 @@ def __dir__():
     ]
 
 
-def get_dialect(d):
-    match d:
+def get_dialect(dialect_request):
+    """Returns the class based on the requested dialect string.
+
+    :param dialect_request: the requested dialect
+    :type dialect_request: str
+
+    :returns: a class instance
+    :rtype: object
+    """
+    match dialect_request:
         case 'SQLite3':
             return SQLite3
         case 'MySQL':
@@ -24,19 +30,37 @@ def get_dialect(d):
         case 'PostgreSQL':
             return PostgreSQL
         case _:
-            raise NotImplementedError(f"{d} not an implemented dialect.")
+            raise NotImplementedError(f"{dialect_request} not an implemented dialect.")
             exit()
 
 
-def get_type(v: object):
-    if isinstance(v, int):
+def get_type(target_value: object):
+    """Returns the type of the value as a string.
+
+    :param target_value: the target value
+    :type target_value: object
+
+    :returns: the type of the value
+    :rtype: str
+    """
+    if isinstance(target_value, int):
         return "int"
-    if isinstance(v, float):
+    if isinstance(target_value, float):
         return "float"
     return "str"
 
 
 def retype(value: object, python_type: str) -> object:
+    """Returns a value converted to the correct type.
+
+    :param value: the target value
+    :type value: object
+    :param python_type: the type to convert to
+    :type python_type: str
+
+    :returns: a class instance
+    :rtype: object
+    """
     match python_type:
         case 'None':
             return None
@@ -78,9 +102,8 @@ class Base:
 
     def get_field(self, field_name: str, field_type: str = '', field_format: str = '',
                   field_modifier: str = None) -> str:
-        ftype = ''
         if field_type:
-            ftype = self.get_sql_type(field_type, field_format)
+            field_type = self.get_sql_type(field_type, field_format)
 
         fmod = ''
         if field_modifier is not None:
@@ -88,7 +111,7 @@ class Base:
 
         return "'{field_name}' {ftype} {fmod}" \
             .replace('{field_name}', field_name) \
-            .replace('{ftype}', ftype) \
+            .replace('{ftype}', field_type) \
             .replace('{fmod}', fmod) \
             .strip()
 
@@ -102,11 +125,16 @@ class Base:
     def make_drop_db_stmt(self) -> None:
         raise NotImplementedError(f"Not implemented.")
 
-    def make_create_table_stmt(self, table_name: str, field_defs: list, end: str = ';') -> str:
+    def make_create_table_stmt(self, table_name: str, field_defs: dict, end: str = ';') -> str:
         stmt = self.STMTS['create_table']
+
+        updated_fields = []
+        for k in field_defs:
+            updated_fields.append(self.get_field(k, field_defs[k]))
+
         return stmt \
             .replace('{table_name}', table_name) \
-            .replace('{field_defs}', field_defs) \
+            .replace('{field_defs}', ", ".join(updated_fields)) \
             .replace('{end}', end) \
             .strip()
 
@@ -361,19 +389,16 @@ if __name__ == '__main__':
     print('MYSQL: ' + m.make_create_db_stmt(TEST_DATABASE))
 
     print('\nCreating tables\n' + dash())
-    fields = {'person_id': 'serial', 'employee_type': 'integer', 'money': 'money', 'food': 'text'}
+    field_defs = {'person_id': 'serial', 'employee_type': 'integer', 'money': 'money', 'food': 'text'}
     values = ['', 1, 12.00, 'Hamburger']
 
-    sqlite_defs = ','.join([s.get_field(fn, fields[fn]) for fn in fields.keys()])
-    print('SQLITE: \t' + s.make_create_table_stmt(TEST_TABLE, sqlite_defs))
+    print('SQLITE: \t' + s.make_create_table_stmt(TEST_TABLE, field_defs))
     print('\t\t' + s.make_create_index_stmt('employee_type', TEST_TABLE), '\n\n')
 
-    mysql_defs = ','.join([m.get_field(fn, fields[fn]) for fn in fields.keys()])
-    print('MYSQL: \t\t' + m.make_create_table_stmt(TEST_TABLE, mysql_defs))
+    print('MYSQL: \t\t' + m.make_create_table_stmt(TEST_TABLE, field_defs))
     print('\t\t' + m.make_create_index_stmt('etype_pid', TEST_TABLE, ['employee_type', 'person_id']), '\n\n')
 
-    postgres_defs = ','.join([m.get_field(fn, fields[fn]) for fn in fields.keys()])
-    print('POSTGRES: \t' + m.make_create_table_stmt(TEST_TABLE, postgres_defs))
+    print('POSTGRES: \t' + m.make_create_table_stmt(TEST_TABLE, field_defs))
     print('\t\t' + p.make_create_index_stmt('etype_pid', TEST_TABLE, ['employee_type', 'person_id'], 'index_'), '\n\n')
 
     print('\nDropping tables\n' + dash())
